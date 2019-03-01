@@ -68,8 +68,8 @@ class AdFinder
         $users = $this->extractCommentUsers();
         $users = $this->filterUsers($users);
         $this->downloadPhotos($users, $this->parentDir . "/" . "photos");
-        $this->analyzePhotosByRule();
-        $adUsers = $this->analyzePhotosByAli();
+        //$this->analyzePhotosByRule();
+        //$adUsers = $this->analyzePhotosByAli();
         return $adUsers;
     }
 
@@ -94,6 +94,9 @@ class AdFinder
             }
             if (!in_array($userid, $users)) {
                 $users[] = $userid;
+            }
+            if(count($users)>100){
+                break;
             }
         }
         fclose($resource);
