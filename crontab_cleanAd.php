@@ -95,6 +95,9 @@ class AdFinder
             if (!in_array($userid, $users)) {
                 $users[] = $userid;
             }
+            if(count($users)>200){
+                break;
+            }
         }
         fclose($resource);
         return $users;
