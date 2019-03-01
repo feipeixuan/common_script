@@ -38,7 +38,7 @@ class AdFinder
         $this->computeHour = date('H', $curTime - 3600);
         $this->parentDir = $parentDir = self::BASE_DIR . $this->dateTime . "/" . $this->computeHour;
         $this->photoAudit = AliyunPhotoAudit::getInstance();
-        $this->redis_super=useSuperNutRedis::getInstance();
+        $this->redis_super = useSuperNutRedis::getInstance();
     }
 
     private function init()
@@ -62,7 +62,7 @@ class AdFinder
      * 得到广告用户
      * 1.提取评论用户 2.基于属性进行裁剪 3.下载头像 4.本地分析头像 5.可疑头像交给阿里判断
      */
-    public function getAdUsers()
+    public function execute()
     {
         $this->init();
         $users = $this->extractCommentUsers();
@@ -70,7 +70,7 @@ class AdFinder
         $this->downloadPhotos($users, $this->parentDir . "/" . "photos");
         $this->analyzePhotosByRule();
         $adUsers = $this->analyzePhotosByAli();
-        return $adUsers;
+        $this->handleAdUser($adUsers);
     }
 
     /**
@@ -94,9 +94,6 @@ class AdFinder
             }
             if (!in_array($userid, $users)) {
                 $users[] = $userid;
-            }
-            if(count($users)>200){
-                break;
             }
         }
         fclose($resource);
@@ -122,7 +119,7 @@ class AdFinder
             // 判断该头像是否已经check过
             $this->redis_super->init();
             $key = 'daily:checkphotos' . date('Ymd');
-            if($this->redis_super->sismember($key,$photoid)){
+            if ($this->redis_super->sismember($key, $photoid)) {
                 continue;
             }
             $cronUsers[$userid] = $photoid;
@@ -170,17 +167,17 @@ class AdFinder
             // 记录该头像已经check过
             $this->redis_super->init();
             $key = 'daily:checkphotos' . date('Ymd');
-            $this->redis_super->sadd($key,$photoid);
-            $this->redis_super->expire($key,86400);
+            $this->redis_super->sadd($key, $photoid);
+            $this->redis_super->expire($key, 86400);
             // 计数器加1
             $this->redis_super->init();
             $key = 'daily:checkphotosnum' . date('Ymd');
             $num = intval($this->redis_super->get($key));
-            if($num>=self::MAX_NUM){
+            if ($num >= self::MAX_NUM) {
                 break;
             }
-            $this->redis_super->incr($key,1);
-            $this->redis_super->expire($key,86400);
+            $this->redis_super->incr($key, 1);
+            $this->redis_super->expire($key, 86400);
         }
         // 下载图片
         $this->downloadPhotos($adUsers, $this->parentDir . "/" . "badphotos");
@@ -228,9 +225,22 @@ class AdFinder
             $this->downloadFile($url, $photoDir . "/$userid:$photoid" . ".jpg");
         }
     }
+
+    /**
+     * 处理广告小号
+     */
+    private function handleAdUser($users)
+    {
+        global $zuitaoktv;
+        foreach ($users as $userid => $photoid) {
+            file_put_contents($this->parentDir."/result.txt","$userid\n");
+            $zuitaoktv->UpdateUserValid($userid, 'all', 0, 0, "广告头像");
+            $zuitaoktv->SetUserHeadPhoto ( $userid, 4 );
+        }
+    }
 }
 
 $instance = new AdFinder();
-$users=$instance->getAdUsers();
-print_r($users);
+$instance->execute();
+
 
