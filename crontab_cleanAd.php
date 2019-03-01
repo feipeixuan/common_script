@@ -68,8 +68,8 @@ class AdFinder
         $users = $this->extractCommentUsers();
         $users = $this->filterUsers($users);
         $this->downloadPhotos($users, $this->parentDir . "/" . "photos");
-        //$this->analyzePhotosByRule();
-        //$adUsers = $this->analyzePhotosByAli();
+        $this->analyzePhotosByRule();
+        $adUsers = $this->analyzePhotosByAli();
         return $adUsers;
     }
 
@@ -94,9 +94,6 @@ class AdFinder
             }
             if (!in_array($userid, $users)) {
                 $users[] = $userid;
-            }
-            if(count($users)>100){
-                break;
             }
         }
         fclose($resource);
@@ -157,11 +154,10 @@ class AdFinder
                 $cronPhotos[$userid] = $photoid;
             }
         }
-        $this->redis_super->init();
-        $key = 'daily:checkphotonum' . date('Ymd');
+
         // 审核图片
         foreach ($cronPhotos as $userid => $photoid) {
-            $url = "http://aliimg.changba.com/cache/photo/" . $photoid . "_320_320.jpg";
+            $url = "http://aliimg.changba.com/cache/photo/" . $photoid . "_200_200.jpg";
             $scenes = array("ad");
             $ret = $this->photoAudit->AuditPhoto(array($userid => $url), $scenes);
             $detail = array_shift($ret);
@@ -169,7 +165,18 @@ class AdFinder
                 $adUsers[$userid] = $photoid;
             }
             // 记录该头像已经check过
+            $this->redis_super->init();
+            $key = 'daily:checkphotos' . date('Ymd');
             $this->redis_super->sadd($key,$photoid);
+            $this->redis_super->expire($key,86400);
+            // 计数器加1
+            $this->redis_super->init();
+            $key = 'daily:checkphotosnum' . date('Ymd');
+            $num = intval($this->redis_super->get($key));
+            if($num>=self::MAX_NUM){
+                break;
+            }
+            $this->redis_super->incr($key,1);
             $this->redis_super->expire($key,86400);
         }
         // 下载图片
@@ -213,7 +220,7 @@ class AdFinder
     private function downloadPhotos($users, $photoDir)
     {
         foreach ($users as $userid => $photoid) {
-            $size = 300;
+            $size = 200;
             $url = 'http://aliimg.changba.com/cache/photo/' . $photoid . "_" . $size . "_" . $size . ".jpg";
             $this->downloadFile($url, $photoDir . "/$userid:$photoid" . ".jpg");
         }
@@ -221,5 +228,6 @@ class AdFinder
 }
 
 $instance = new AdFinder();
-$instance->getAdUsers();
+$users=$instance->getAdUsers();
+print_r($users);
 
