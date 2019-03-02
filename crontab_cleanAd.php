@@ -36,7 +36,7 @@ class AdFinder
         $curTime = time();
         $this->dateTime = date('Ymd', $curTime - 3600);
         $this->computeHour = date('H', $curTime - 3600);
-        $this->parentDir = $parentDir = self::BASE_DIR . $this->dateTime . "/" . $this->computeHour;
+        $this->parentDir = self::BASE_DIR . $this->dateTime . "/" . $this->computeHour;
         $this->photoAudit = AliyunPhotoAudit::getInstance();
         $this->redis_super = useSuperNutRedis::getInstance();
     }
@@ -56,6 +56,12 @@ class AdFinder
                 mkdir($this->parentDir . "/" . $dirName);
             }
         }
+        $originalFile=self::BASE_DIR."input/"."$this->dateTime$this->computeHour".".log";
+        $destinationFile=self::BASE_DIR.$this->dateTime. "/" . $this->computeHour. "/input/" . $this->computeHour . ".log";
+        echo $originalFile."\n";
+        echo $destinationFile."\n";
+        //copy($originalFile,$destinationFile); //拷贝到新目录
+        //unlink($originalFile); //删除旧目录下的文件
     }
 
     /**
@@ -241,6 +247,6 @@ class AdFinder
 }
 
 $instance = new AdFinder();
-$instance->execute();
+//$instance->execute();
 
 
