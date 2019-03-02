@@ -58,10 +58,8 @@ class AdFinder
         }
         $originalFile=self::BASE_DIR."input/"."$this->dateTime$this->computeHour".".log";
         $destinationFile=self::BASE_DIR.$this->dateTime. "/" . $this->computeHour. "/input/" . $this->computeHour . ".log";
-        echo $originalFile."\n";
-        echo $destinationFile."\n";
-        //copy($originalFile,$destinationFile); //拷贝到新目录
-        //unlink($originalFile); //删除旧目录下的文件
+        copy($originalFile,$destinationFile); //拷贝到新目录
+        unlink($originalFile); //删除旧目录下的文件
     }
 
     /**
@@ -237,16 +235,16 @@ class AdFinder
      */
     private function handleAdUser($users)
     {
-        global $zuitaoktv;
+        global $zuitaoKtv;
         foreach ($users as $userid => $photoid) {
-            file_put_contents($this->parentDir."/result.txt","$userid\n");
-            $zuitaoktv->UpdateUserValid($userid, 'all', 0, 0, "广告头像");
-            $zuitaoktv->SetUserHeadPhoto ( $userid, 4 );
+            file_put_contents($this->parentDir."/result.txt","$userid\n",FILE_APPEND);
+            $zuitaoKtv->UpdateUserValid($userid, 'all', 0, 0, "广告头像");
+            $zuitaoKtv->SetUserHeadPhoto ( $userid, 4 );
         }
     }
 }
 
 $instance = new AdFinder();
-//$instance->execute();
+$instance->execute();
 
 
