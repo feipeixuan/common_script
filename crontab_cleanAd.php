@@ -4,8 +4,8 @@
  * Author: feipeixuan
  */
 
-include __DIR__ . "/../../../common/common.inc.php";
-require __DIR__ . "/../../../tools/aliyun_photo_review/photo_audit_by_aliyun.class.php";
+include __DIR__ . "/../../common/common.inc.php";
+require __DIR__ . "/../../tools/aliyun_photo_review/photo_audit_by_aliyun.class.php";
 
 $zuitaoKtv = ZuitaoKTV::getInstance();
 
@@ -39,10 +39,6 @@ class AdFinder
         $this->parentDir = self::BASE_DIR . $this->dateTime . "/" . $this->computeHour;
         $this->photoAudit = AliyunPhotoAudit::getInstance();
         $this->redis_super = useSuperNutRedis::getInstance();
-    }
-
-    private function init()
-    {
         // 创建相关的文件目录
         if (!is_dir(self::BASE_DIR . $this->dateTime)) {
             mkdir(self::BASE_DIR . $this->dateTime);
@@ -56,10 +52,18 @@ class AdFinder
                 mkdir($this->parentDir . "/" . $dirName);
             }
         }
-        $originalFile=self::BASE_DIR."input/"."$this->dateTime$this->computeHour".".log";
-        $destinationFile=self::BASE_DIR.$this->dateTime. "/" . $this->computeHour. "/input/" . $this->computeHour . ".log";
-        copy($originalFile,$destinationFile); //拷贝到新目录
+        $originalFile = self::BASE_DIR . "input/" . "$this->dateTime$this->computeHour" . ".log";
+        $destinationFile = self::BASE_DIR . $this->dateTime . "/" . $this->computeHour . "/input/" . $this->computeHour . ".log";
+        copy($originalFile, $destinationFile); //拷贝到新目录
         unlink($originalFile); //删除旧目录下的文件
+    }
+
+    function __destruct()
+    {
+        $logFile = self::BASE_DIR . $this->dateTime . "/" . $this->computeHour . "/input/" . $this->computeHour . ".log";
+        unlink($logFile);
+        $this->cleanDir($this->parentDir . "/" . "photos");
+        $this->cleanDir($this->parentDir . "/" . "cronphotos");
     }
 
     /**
@@ -68,13 +72,32 @@ class AdFinder
      */
     public function execute()
     {
-        $this->init();
         $users = $this->extractCommentUsers();
         $users = $this->filterUsers($users);
         $this->downloadPhotos($users, $this->parentDir . "/" . "photos");
         $this->analyzePhotosByRule();
         $adUsers = $this->analyzePhotosByAli();
         $this->handleAdUser($adUsers);
+    }
+
+    /**
+     * 删除文件夹
+     */
+    private function cleanDir($path = null)
+    {
+        if (is_dir($path)) {    //判断是否是目录
+            $p = scandir($path);     //获取目录下所有文件
+            foreach ($p as $value) {
+                if ($value != '.' && $value != '..') {    //排除掉当./和../
+                    if (is_dir($path . '/' . $value)) {
+                        $this->cleanDir($path . '/' . $value);    //递归调用删除方法
+                        rmdir($path . '/' . $value);    //删除当前文件夹
+                    } else {
+                        unlink($path . '/' . $value);    //删除当前文件
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -237,14 +260,14 @@ class AdFinder
     {
         global $zuitaoKtv;
         foreach ($users as $userid => $photoid) {
-            file_put_contents($this->parentDir."/result.txt","$userid\n",FILE_APPEND);
-            $zuitaoKtv->UpdateUserValid($userid, 'all', 0, 0, "广告头像");
-            $zuitaoKtv->SetUserHeadPhoto ( $userid, 4 );
+            file_put_contents($this->parentDir . "/result.txt", "$userid\n", FILE_APPEND);
+            $zuitaoKtv->UpdateUserValid($userid, 'all', 0, 0, "广告头像$photoid");
+            $zuitaoKtv->SetUserHeadPhoto($userid, 4);
         }
     }
 }
 
-$instance = new AdFinder();
-$instance->execute();
+$adFinder = new AdFinder();
+$adFinder->execute();
 
 
