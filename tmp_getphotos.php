@@ -36,6 +36,7 @@ foreach ($fileList as $file){
 }
 $users=array_unique($users);
 $cronUsers=array_unique($cronUsers);
-echo count($users)."\n";
-echo count($cronUsers)."\n";
-echo count(array_diff($users,$cronUsers))."\n";
+$normalUsers=array_diff($users,$cronUsers);
+foreach ($normalUsers as $normalUser){
+    file_put_contents(__DIR__."/result1.txt",$normalUser."\n",FILE_APPEND);
+}
