@@ -19,7 +19,7 @@ function getPhotos($path)
                 $photoInfo = explode(".", $file)[0];
                 $userid = explode(":", $photoInfo)[0];
                 $photoid = explode(":", $photoInfo)[1];
-                $users[$userid]=$photoid;
+                $users[]=$photoid;
             }
         }
     }
@@ -34,6 +34,8 @@ foreach ($fileList as $file){
         $cronUsers=array_merge(getPhotos($rootDir."/$file/cronphotos"),$cronUsers);
     }
 }
+$users=array_unique($users);
+$cronUsers=array_unique($cronUsers);
 echo count($users)."\n";
 echo count($cronUsers)."\n";
 echo count(array_diff($users,$cronUsers))."\n";
