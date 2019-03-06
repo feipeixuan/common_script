@@ -31,7 +31,9 @@ $fileList=scandir($rootDir);
 foreach ($fileList as $file){
     if ($file != '.' && $file != '..' && $file!="result.txt") {
         $users=array_merge(getPhotos($rootDir."/$file/photos"),$users);
-        $cronUsers=array_merge($rootDir."/$file/cronphotos",$cronUsers);
+        $cronUsers=array_merge(getPhotos($rootDir."/$file/cronphotos"),$cronUsers);
     }
 }
-print_r(array_diff($users,$cronUsers));
+echo count($users)."\n";
+echo count($cronUsers)."\n";
+echo count(array_diff($users,$cronUsers))."\n";
