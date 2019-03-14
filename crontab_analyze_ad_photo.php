@@ -259,9 +259,13 @@ class AdFinder
             if ($file != ".." && $file != ".") {
                 $photoInfo = explode(".", $file)[0];
                 $userid = explode(":", $photoInfo)[0];
+                $photoid = explode(":", $photoInfo)[1];
                 $this->addFeedback($userid);
                 // 后面的图片就不走python脚本了
                 unlink($inputDir."$file");
+                $info=$this->formatString($userid,$photoid);
+                file_put_contents($this->parentDir . "/result.txt", $info, FILE_APPEND);
+                file_put_contents(self::BASE_DIR . $this->dateTime . "/result.txt", $info, FILE_APPEND);
             }
         }
     }
@@ -317,20 +321,9 @@ class AdFinder
         global $zuitaoKtv;
         foreach ($users as $userid => $photoid) {
             // 获取版本信息
-            $redis_user_extra = new useUserExtraRedis ();
-            $userextrainfo = $redis_user_extra->init()->hGetAll("uid:{$userid}");
-            $changbaversion = isset ($userextrainfo ['versionnumber']) ? $userextrainfo ['versionnumber'] : 'unknown';
-            $info="$userid:$photoid:$changbaversion\n";
-            $isPayUser=false;
-            if(!$this->firstPaymentActivityService->isFirstPaymentUser($userid)) {
-                $info="$userid:$photoid:$changbaversion:付费用户\n";
-                $isPayUser=true;
-            }
+            $info=$this->formatString($userid,$photoid);
             file_put_contents($this->parentDir . "/result.txt", $info, FILE_APPEND);
             file_put_contents(self::BASE_DIR . $this->dateTime . "/result.txt", $info, FILE_APPEND);
-            if($isPayUser){
-                continue;
-            }
             // 进行封禁处理
             //$zuitaoKtv->UpdateUserValid($userid, 'all', 0, 0, "广告头像$photoid");
             //$zuitaoKtv->SetUserHeadPhoto($userid, 4);
@@ -350,6 +343,17 @@ class AdFinder
         global $db_admin_internal;
         $sql = "insert into feedback (actionid,userid, type, subtype, answered) values($userid, 0,1,0,0)";
         $db_admin_internal->query ( $sql );
+    }
+
+    private function formatString($userid,$photoid){
+        $redis_user_extra = new useUserExtraRedis ();
+        $userextrainfo = $redis_user_extra->init()->hGetAll("uid:{$userid}");
+        $changbaversion = isset ($userextrainfo ['versionnumber']) ? $userextrainfo ['versionnumber'] : 'unknown';
+        $info="$userid:$photoid:$changbaversion\n";
+        if(!$this->firstPaymentActivityService->isFirstPaymentUser($userid)) {
+            $info="$userid:$photoid:$changbaversion:付费用户\n";
+        }
+        return $info;
     }
 
 }
