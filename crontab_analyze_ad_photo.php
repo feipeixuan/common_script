@@ -58,15 +58,15 @@ class AdFinder
         $originalFile = self::BASE_DIR . "input/" . "$this->dateTime$this->computeHour" . ".log";
         $destinationFile = self::BASE_DIR . $this->dateTime . "/" . $this->computeHour . "/input/" . $this->computeHour . ".log";
         copy($originalFile, $destinationFile); //拷贝到新目录
-        unlink($originalFile); //删除旧目录下的文件
+        //unlink($originalFile); //删除旧目录下的文件
     }
 
     function __destruct()
     {
         $logFile = self::BASE_DIR . $this->dateTime . "/" . $this->computeHour . "/input/" . $this->computeHour . ".log";
         unlink($logFile);
-        $this->cleanDir($this->parentDir . "/" . "photos");
-        $this->cleanDir($this->parentDir . "/" . "cronphotos");
+       // $this->cleanDir($this->parentDir . "/" . "photos");
+       // $this->cleanDir($this->parentDir . "/" . "cronphotos");
     }
 
     /**
@@ -79,9 +79,9 @@ class AdFinder
         $users = $this->filterUsers($users);
         $this->downloadPhotos($users, $this->parentDir . "/" . "photos");
         $this->analyzePhotosBySim();
-        $this->analyzePhotosByRule();
-        $adUsers = $this->analyzePhotosByAli();
-        $this->handleAdUser($adUsers);
+        //$this->analyzePhotosByRule();
+        //$adUsers = $this->analyzePhotosByAli();
+        //$this->handleAdUser($adUsers);
     }
 
     /**
@@ -250,8 +250,8 @@ class AdFinder
      * 基于相似度分析图片
      */
     public function analyzePhotosBySim(){
-        $inputDir = $this->parentDir . "/" . "photos";
-        $outputDir = $this->parentDir . "/" . "simphotos";
+        $inputDir = $this->parentDir . "/" . "photos/";
+        $outputDir = $this->parentDir . "/" . "simphotos/";
         exec("python2 simfinder.py $inputDir $outputDir sim");
         $fileList = scandir($this->parentDir . "/" . "simphotos");
         // 反馈可疑图片
@@ -261,7 +261,7 @@ class AdFinder
                 $userid = explode(":", $photoInfo)[0];
                 $this->addFeedback($userid);
                 // 后面的图片就不走python脚本了
-                unlink($inputDir."/$file");
+                unlink($inputDir."$file");
             }
         }
     }
