@@ -58,15 +58,16 @@ class AdFinder
         $originalFile = self::BASE_DIR . "input/" . "$this->dateTime$this->computeHour" . ".log";
         $destinationFile = self::BASE_DIR . $this->dateTime . "/" . $this->computeHour . "/input/" . $this->computeHour . ".log";
         copy($originalFile, $destinationFile); //拷贝到新目录
-        //unlink($originalFile); //删除旧目录下的文件
+        unlink($originalFile); //删除旧目录下的文件
     }
 
     function __destruct()
     {
         $logFile = self::BASE_DIR . $this->dateTime . "/" . $this->computeHour . "/input/" . $this->computeHour . ".log";
         unlink($logFile);
-       // $this->cleanDir($this->parentDir . "/" . "photos");
-       // $this->cleanDir($this->parentDir . "/" . "cronphotos");
+        $this->cleanDir($this->parentDir . "/" . "photos");
+        $this->cleanDir($this->parentDir . "/" . "cronphotos");
+        $this->cleanDir($this->parentDir . "/" . "simphotos");
     }
 
     /**
@@ -79,9 +80,9 @@ class AdFinder
         $users = $this->filterUsers($users);
         $this->downloadPhotos($users, $this->parentDir . "/" . "photos");
         $this->analyzePhotosBySim();
-        //$this->analyzePhotosByRule();
-        //$adUsers = $this->analyzePhotosByAli();
-        //$this->handleAdUser($adUsers);
+        $this->analyzePhotosByRule();
+        $adUsers = $this->analyzePhotosByAli();
+        $this->handleAdUser($adUsers);
     }
 
     /**
@@ -266,6 +267,10 @@ class AdFinder
                 $info=$this->formatString($userid,$photoid);
                 file_put_contents($this->parentDir . "/result.txt", $info, FILE_APPEND);
                 file_put_contents(self::BASE_DIR . $this->dateTime . "/result.txt", $info, FILE_APPEND);
+                $key = 'daily:badphotos' . date('Ymd');
+                $this->redis_super->init();
+                $this->redis_super->hset($key,$userid,$photoid);
+                $this->redis_super->expire($key, 86400);
             }
         }
     }
