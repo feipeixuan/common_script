@@ -349,9 +349,9 @@ class AdFinder
         $redis_user_extra = new useUserExtraRedis ();
         $userextrainfo = $redis_user_extra->init()->hGetAll("uid:{$userid}");
         $changbaversion = isset ($userextrainfo ['versionnumber']) ? $userextrainfo ['versionnumber'] : 'unknown';
-        $info="$userid:$photoid:$changbaversion\n";
+        $info=date('Ymd_H').":$userid:$photoid:$changbaversion\n";
         if(!$this->firstPaymentActivityService->isFirstPaymentUser($userid)) {
-            $info="$userid:$photoid:$changbaversion:付费用户\n";
+            $info=date('Ymd_H').":$userid:$photoid:$changbaversion:付费用户\n";
         }
         return $info;
     }
