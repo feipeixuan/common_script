@@ -55,16 +55,21 @@ class AdFinder
                 mkdir($this->parentDir . "/" . $dirName);
             }
         }
+        // 基础AC
         $originalFile = self::BASE_DIR . "input/" . "$this->dateTime$this->computeHour" . ".log";
         $destinationFile = self::BASE_DIR . $this->dateTime . "/" . $this->computeHour . "/input/" . $this->computeHour . ".log";
+        copy($originalFile, $destinationFile); //拷贝到新目录
+        unlink($originalFile); //删除旧目录下的文件
+        // 上传头像
+        $originalFile = self::BASE_DIR . "input/" . "$this->dateTime$this->computeHour" . "uploaduserheadphoto.log";
+        $destinationFile = self::BASE_DIR . $this->dateTime . "/" . $this->computeHour . "/input/" . $this->computeHour . "uploaduserheadphoto.log";
         copy($originalFile, $destinationFile); //拷贝到新目录
         unlink($originalFile); //删除旧目录下的文件
     }
 
     function __destruct()
     {
-        $logFile = self::BASE_DIR . $this->dateTime . "/" . $this->computeHour . "/input/" . $this->computeHour . ".log";
-        unlink($logFile);
+        $this->cleanDir($this->parentDir . "/" . "input");
         $this->cleanDir($this->parentDir . "/" . "photos");
         $this->cleanDir($this->parentDir . "/" . "cronphotos");
         $this->cleanDir($this->parentDir . "/" . "simphotos");
@@ -72,11 +77,11 @@ class AdFinder
 
     /**
      * 得到广告用户
-     * 1.提取评论用户 2.基于属性进行裁剪 3.下载头像 4.本地分析头像 5.可疑头像交给阿里判断
+     * 1.提取用户 2.基于属性进行裁剪 3.下载头像 4.本地分析头像 5.可疑头像交给阿里判断
      */
     public function execute()
     {
-        $users = $this->extractCommentUsers();
+        $users = $this->extractUsers();
         $users = $this->filterUsers($users);
         $this->downloadPhotos($users, $this->parentDir . "/" . "photos");
         $this->analyzePhotosBySim();
@@ -106,9 +111,9 @@ class AdFinder
     }
 
     /**
-     * 提取参与评论的用户
+     * 提取相关用户
      */
-    public function extractCommentUsers()
+    public function extractUsers()
     {
         $commentUsers = array();
         $followUsers = array();
@@ -159,9 +164,30 @@ class AdFinder
                 $cronUsers[]=$userid;
             }
         }
+        $cronUsers=array_merge($cronUsers,$this->extractUploadPhotoUsers());
         $cronUsers=array_unique($cronUsers);
         fclose($resource);
         return $cronUsers;
+    }
+
+    /**
+     * 提取上传头像的用户
+     */
+    private function extractUploadPhotoUsers(){
+        $uploadUsers = array();
+        $logFile = self::BASE_DIR . $this->dateTime . "/" . $this->computeHour . "/input/" . $this->computeHour . "uploaduserheadphoto.log";
+        $resource = fopen($logFile, "r");
+        while (!feof($resource)){
+            $line = fgets($resource);
+            $params = explode("\t", $line);
+            if (count($params) < 2) {
+                break;
+            }
+            $userid = $params [2];
+            $uploadUsers[]=$userid;
+        }
+        $uploadUsers=array_unique($uploadUsers);
+        return $uploadUsers;
     }
 
     /**
@@ -175,6 +201,10 @@ class AdFinder
             $richLevel = $userinfo->userlevel->richLevel;
             $starLevel = $userinfo->userlevel->starLevel;
             if ($richLevel >= 1 || $starLevel >= 1) {
+                continue;
+            }
+            // 判断用户是否被封禁
+            if(ZuitaoKTV::getInstance()->CheckUserActionValid($userid,"all_evil")){
                 continue;
             }
             if (!($photoid = $this->getPhotoId($userid))) {
