@@ -11,7 +11,8 @@ function getInValidUsers(){
     $endId=42190116;
     $step=20000;
     while (true){
-        $sql="select userid from user_valid where id between $startId and $startId+$step and release_time >='2025-01-01'";
+        $sql="select userid from user_valid where id between $startId and $startId+$step and 
+              release_time >='2025-01-01' and (action='all_evil' or action ='all_main') ";
         $rows=$db_stats_write->getAll($sql);
         foreach ($rows as $row){
             file_put_contents("invalidUser.txt",$row['userid']."\n",FILE_APPEND);
