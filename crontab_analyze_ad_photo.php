@@ -33,6 +33,10 @@ class AdFinder
 
     private $firstPaymentActivityService;
 
+    private $blackFingers;
+
+    private $fingers;
+
     function __construct()
     {
         $curTime = time();
@@ -81,9 +85,11 @@ class AdFinder
      */
     public function execute()
     {
+        $this->blackFingers=$this->getBlackFingers();
         $users = $this->extractUsers();
         $users = $this->filterUsers($users);
         $this->downloadPhotos($users, $this->parentDir . "/" . "photos");
+        $this->fingers=$this->getFingers();
         $this->analyzePhotosBySim();
         $this->analyzePhotosByRule();
         $adUsers = $this->analyzePhotosByAli();
@@ -117,6 +123,7 @@ class AdFinder
     {
         $commentUsers = array();
         $followUsers = array();
+        $listenUsers = array();
         $cronUsers = array();
         $logFile = self::BASE_DIR . $this->dateTime . "/" . $this->computeHour . "/input/" . $this->computeHour . ".log";
         $resource = fopen($logFile, "r");
@@ -128,7 +135,7 @@ class AdFinder
             }
             $ac = $params [1];
             $userid = $params [2];
-            if ($ac != "giveworkcomment" && $ac!="followuser") {
+            if ($ac != "giveworkcomment" && $ac!="followuser" && $ac !="recordworklistentime") {
                 continue;
             }
             if($ac == "giveworkcomment")
@@ -151,6 +158,16 @@ class AdFinder
                     $followUsers[$userid][] = $followid;
                 }
             }
+            if($ac == "recordworklistentime")
+            {
+                $workid = $params [4];
+                if (!key_exists($userid, $listenUsers)) {
+                    $listenUsers[$userid] = array();
+                }
+                if (!in_array($workid, $listenUsers[$userid])) {
+                    $listenUsers[$userid][] = $workid;
+                }
+            }
         }
         //阈值暂时调整到3
         foreach ($commentUsers as $userid=>$works){
@@ -161,6 +178,12 @@ class AdFinder
         //阈值暂时调整到3
         foreach ($followUsers as $userid=>$follows){
             if(count($follows)>=3){
+                $cronUsers[]=$userid;
+            }
+        }
+        //阈值暂时调整到50
+        foreach ($listenUsers as $userid=>$works){
+            if(count($works)>=50){
                 $cronUsers[]=$userid;
             }
         }
@@ -251,11 +274,8 @@ class AdFinder
 
         // 审核图片
         foreach ($cronPhotos as $userid => $photoid) {
-            $url = "http://aliimg.changba.com/cache/photo/" . $photoid . "_200_200.jpg";
-            $scenes = array("ad");
-            $ret = $this->photoAudit->AuditPhoto(array($userid => $url), $scenes);
-            $detail = array_shift($ret);
-            if ($detail["status"] == AliyunPhotoAudit::$block) {
+            // 调用阿里云进行判断审核
+            if ($this->isAdPhotoByAli($photoid)) {
                 $adUsers[$userid] = $photoid;
             }
             // 记录该头像已经check过
@@ -281,6 +301,7 @@ class AdFinder
      * 基于相似度分析图片
      */
     public function analyzePhotosBySim(){
+        global $zuitaoKtv;
         $inputDir = $this->parentDir . "/" . "photos/";
         $outputDir = $this->parentDir . "/" . "simphotos/";
         exec("python2 simfinder.py $inputDir $outputDir sim");
@@ -291,10 +312,24 @@ class AdFinder
                 $photoInfo = explode(".", $file)[0];
                 $userid = explode(":", $photoInfo)[0];
                 $photoid = explode(":", $photoInfo)[1];
-                $this->addFeedback($userid);
+                $isBlackPhoto=false;
+                // TODO 阿里云审核一次
+                if($this->isAdPhotoByAli($photoid)){
+                    $flag1=key_exists($photoid,$this->fingers);
+                    $flag2=key_exists($this->fingers[$photoid],$this->blackFingers);
+                    if($flag1 && $flag2){
+                      $isBlackPhoto=true;
+                    }
+                }
+                if($isBlackPhoto){
+                    $zuitaoKtv->UpdateUserValid($userid, 'all', 0, 0, "广告头像$photoid");
+                    $zuitaoKtv->SetUserHeadPhoto($userid, 4);
+                }else {
+                    $this->addFeedback($userid);
+                }
                 // 后面的图片就不走python脚本了
                 unlink($inputDir."$file");
-                $info=$this->formatString($userid,$photoid);
+                $info=$this->formatString($userid,$photoid,$isBlackPhoto);
                 file_put_contents($this->parentDir . "/result.txt", $info, FILE_APPEND);
                 file_put_contents(self::BASE_DIR . $this->dateTime . "/result.txt", $info, FILE_APPEND);
                 $key = 'daily:badphotos' . date('Ymd');
@@ -313,7 +348,7 @@ class AdFinder
         global $ktv_read;
         $sql = "select headphoto from user where userid=$userid";
         $photoid = $ktv_read->getOne($sql);
-        if (empty($photoid) or $photoid == 4) {
+        if (empty($photoid) || $photoid == 4) {
             return false;
         }
         return $photoid;
@@ -355,15 +390,24 @@ class AdFinder
     {
         global $zuitaoKtv;
         foreach ($users as $userid => $photoid) {
+            $isBlackPhoto=false;
+            $flag1=key_exists($photoid,$this->fingers);
+            $flag2=key_exists($this->fingers[$photoid],$this->blackFingers);
+            if($flag1 && $flag2){
+                $isBlackPhoto=true;
+                // 进行封禁处理
+                $zuitaoKtv->UpdateUserValid($userid, 'all', 0, 0, "广告头像$photoid");
+                $zuitaoKtv->SetUserHeadPhoto($userid, 4);
+            }
             // 获取版本信息
-            $info=$this->formatString($userid,$photoid);
+            $info=$this->formatString($userid,$photoid,$isBlackPhoto);
             file_put_contents($this->parentDir . "/result.txt", $info, FILE_APPEND);
             file_put_contents(self::BASE_DIR . $this->dateTime . "/result.txt", $info, FILE_APPEND);
-            // 进行封禁处理
-            //$zuitaoKtv->UpdateUserValid($userid, 'all', 0, 0, "广告头像$photoid");
-            //$zuitaoKtv->SetUserHeadPhoto($userid, 4);
-            $this->addFeedback($userid);
             $key = 'daily:badphotos' . date('Ymd');
+            $oldPhotoId=$this->redis_super->init()->hget($key,$userid);
+            if($oldPhotoId!=$photoid && !$isBlackPhoto) {
+                $this->addFeedback($userid);
+            }
             $this->redis_super->init();
             $this->redis_super->hset($key,$userid,$photoid);
             $this->redis_super->expire($key, 86400);
@@ -380,17 +424,67 @@ class AdFinder
         $db_admin_internal->query ( $sql );
     }
 
-    private function formatString($userid,$photoid){
+    private function formatString($userid,$photoid,$isBlackPhoto){
         $redis_user_extra = new useUserExtraRedis ();
         $userextrainfo = $redis_user_extra->init()->hGetAll("uid:{$userid}");
         $changbaversion = isset ($userextrainfo ['versionnumber']) ? $userextrainfo ['versionnumber'] : 'unknown';
-        $info=date('Ymd_H').":$userid:$photoid:$changbaversion\n";
+        $info=date('Ymd_H').":$userid:$photoid:$changbaversion";
         if(!$this->firstPaymentActivityService->isFirstPaymentUser($userid)) {
-            $info=date('Ymd_H').":$userid:$photoid:$changbaversion:付费用户\n";
+            $info=$info.":付费用户";
         }
+        if($isBlackPhoto){
+            $info=$info.":头像在黑名单中";
+        }
+        $info=$info."\n";
         return $info;
     }
 
+    public function getBlackFingers(){
+        global $db_admin_internal;
+        $blackFingers = array();
+        $sql = "select distinct(finger) as finger from spam_blackphoto where status=2 ";
+        $rows = $db_admin_internal->getAll($sql);
+        foreach ($rows as $row){
+            $blackFingers[]=$row['finger'];
+        }
+        return $blackFingers;
+    }
+
+    // 判断图片是否是广告图片
+    public function isAdPhotoByAli($photoid){
+        $url = "http://aliimg.changba.com/cache/photo/" . $photoid . "_200_200.jpg";
+        $scenes = array("ad");
+        $ret = $this->photoAudit->AuditPhoto(array($photoid => $url), $scenes);
+        $detail = array_shift($ret);
+        if($detail["status"] == AliyunPhotoAudit::$block){
+            return true;
+        }else{
+            return false;
+        }
+    }
+
+    // 计算整体的指纹
+    public function getFingers(){
+        $fingers=array();
+        $inputDir = $this->parentDir . "/" . "photos";
+        exec("python2 simfinder.py $inputDir $inputDir outputfingers");
+        $resource=fopen($inputDir."fingers.txt","r");
+        while (!feof($resource)){
+            $line=fgets($resource);
+            $line=str_replace("\n","",$line);
+            $info=explode(":",$line);
+            if(count($info)<2){
+                break;
+            }
+            $photoid=explode(".",$info[1])[0];
+            $finger=$info[2];
+            if(strlen($finger)>=10) {
+                $fingers[$photoid] = $finger;
+            }
+        }
+        fclose($resource);
+        return $fingers;
+    }
 }
 
 $adFinder = new AdFinder();
