@@ -15,7 +15,7 @@ class AdFinder
     const BASE_DIR = "/home/log/audit/";
 
     // 最大单日调用量
-    const MAX_NUM = 30000;
+    const MAX_NUM = 50000;
 
     // 年月日
     private $dateTime;
@@ -72,11 +72,11 @@ class AdFinder
     }
 
     function __destruct()
-    {
-        $this->cleanDir($this->parentDir . "/" . "input");
-        $this->cleanDir($this->parentDir . "/" . "photos");
-        $this->cleanDir($this->parentDir . "/" . "cronphotos");
-        $this->cleanDir($this->parentDir . "/" . "simphotos");
+    { 
+       $this->cleanDir($this->parentDir . "/" . "input");
+       $this->cleanDir($this->parentDir . "/" . "photos");
+       $this->cleanDir($this->parentDir . "/" . "cronphotos");
+       $this->cleanDir($this->parentDir . "/" . "simphotos");
     }
 
     /**
@@ -466,7 +466,7 @@ class AdFinder
     // 计算整体的指纹
     public function getFingers(){
         $fingers=array();
-        $inputDir = $this->parentDir . "/" . "photos";
+        $inputDir = $this->parentDir . "/" . "photos/";
         exec("python2 simfinder.py $inputDir $inputDir outputfingers");
         $resource=fopen($inputDir."fingers.txt","r");
         while (!feof($resource)){
@@ -483,6 +483,7 @@ class AdFinder
             }
         }
         fclose($resource);
+        print_r($fingers);
         return $fingers;
     }
 }
